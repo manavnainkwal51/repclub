@@ -33,6 +33,14 @@ node scripts/serve.mjs
 
 Open the localhost address printed by the server. Use an HTTPS static host to install on a separate Android phone. Deploy the contents of `dist/`; relative manifest paths also support a project subdirectory. The hosted version uses the existing Sites project. GitHub source publishing is separate from site deployment.
 
+## Deploy on Vercel
+
+Import `manavnainkwal51/repclub` and deploy the `main` branch. Keep the **Root Directory** at the repository root (empty in Vercel settings), not `dist`. The included `vercel.json` selects **Other** (no framework), skips installation and building, and serves the already-bundled `dist` directory.
+
+If an earlier deployment shows `404 NOT_FOUND`, check **Settings → Build and Deployment**: Root Directory should be empty, Framework Preset **Other**, Output Directory **dist**, and Build Command empty. Deploy the latest `main` commit, then open that deployment's URL from Vercel's **Visit** button. An obsolete or deleted deployment URL can also return a 404.
+
+No environment variables, database, or API keys are required. Hosting downloads public app assets; workout data remains local to the browser/device.
+
 ## Checks
 
 ```sh
