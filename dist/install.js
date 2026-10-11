@@ -1,0 +1,25 @@
+'use strict';
+(() => {
+ let installPrompt=null,registration=null,readyOffline=false,imageCount=0,imageTotal=0,requestedUpdate=false,installationConfirmed=false;
+ const status=document.getElementById('offlineStatus');
+ const installed=()=>installationConfirmed||window.matchMedia('(display-mode: standalone)').matches||Boolean(navigator.standalone);
+ function paint(){
+  if(status){status.textContent=!navigator.onLine?(readyOffline?'Offline · ready':'Offline · setup incomplete'):readyOffline?'Ready offline':imageTotal?`Saving images ${imageCount}/${imageTotal}`:'Preparing offline…';status.classList.toggle('ready',readyOffline);status.classList.toggle('disconnected',!navigator.onLine)}
+  document.querySelectorAll('[data-install-app],#installApp').forEach(b=>{b.textContent=installed()?'App installed ✓':'Install app ↗';b.hidden=installed()&&b.id==='installApp'});
+  const detail=document.getElementById('offlineDetail');if(detail)detail.textContent=readyOffline?'The app, exercise instructions, and available images are saved on this device. You can train without internet.':'Keep this page open online while the exercise library downloads. The status at the top will say “Ready offline” when it’s finished.';
+ }
+ function instructions(){if(typeof modal!=='function')return;modal(`<div class="eyebrow">YOUR CLUB, ON YOUR HOME SCREEN</div><h2 class="modal-title">Take Repclub to the gym.</h2><p class="subtext">Open this site in Chrome on your Android phone. Sign in to your ChatGPT account if the private site asks.</p><ol class="detail-list"><li>Tap Chrome’s <strong>⋮</strong> menu.</li><li>Choose <strong>Install and create shortcut → Install</strong>. Some versions show <strong>Add to Home screen → Install</strong>.</li><li>Keep the app open online until the top status says <strong>Ready offline</strong>.</li></ol><p class="subtext">Your workouts and records stay on your phone. Export a backup in Preferences to keep a separate copy.</p><button class="button yellow" data-action="close-modal">Got it ${icon('check')}</button>`)}
+ async function install(){if(installed()){toast('Repclub is already running as an app.');return}if(!installPrompt){instructions();return}const prompt=installPrompt;installPrompt=null;try{await prompt.prompt();const choice=await prompt.userChoice;if(choice.outcome==='accepted'){toast('Repclub is joining your home screen.');if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{})}}catch{instructions()}paint()}
+ window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;paint()});
+ window.addEventListener('appinstalled',()=>{installationConfirmed=true;installPrompt=null;paint();toast('Welcome to your little stronger app.')});
+ window.addEventListener('online',()=>{paint();if(registration?.active)registration.active.postMessage({type:'PREPARE_OFFLINE'})});
+ window.addEventListener('offline',paint);
+ document.addEventListener('click',event=>{const b=event.target.closest('#installApp,[data-install-app],[data-update-app],[data-retry-offline]');if(!b)return;if(b.matches('[data-update-app]')){if(typeof state!=='undefined'&&state.session){toast('Finish or discard your active workout before updating.');return}if(registration?.waiting){requestedUpdate=true;registration.waiting.postMessage({type:'ACTIVATE_UPDATE'});}else toast('You’re on the latest available version.')}else if(b.matches('[data-retry-offline]')){if(!navigator.onLine){toast('Go online to finish downloading the exercise images.');return}registration?.active?.postMessage({type:'PREPARE_OFFLINE'});paint()}else install()});
+ new MutationObserver(paint).observe(document.getElementById('main'),{childList:true});
+ paint();
+ if(!('serviceWorker' in navigator)||!window.isSecureContext){if(status)status.textContent='Offline setup unavailable';return}
+ let reloading=false;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;if(requestedUpdate){reloading=true;location.reload();return}if(registration?.active)registration.active.postMessage({type:'GET_OFFLINE_STATUS'});});
+ navigator.serviceWorker.addEventListener('message',event=>{const data=event.data||{};if(data.type==='OFFLINE_PROGRESS'){imageCount=data.done;imageTotal=data.total;readyOffline=Boolean(data.complete);paint()}if(data.type==='OFFLINE_ERROR'){if(status)status.textContent='Offline download paused';toast('Some images haven’t downloaded. Retry in Preferences while online.')}});
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(async reg=>{registration=reg;if(reg.waiting)toast('An app update is ready. Install it from Preferences.');reg.addEventListener('updatefound',()=>{reg.installing?.addEventListener('statechange',()=>{if(reg.waiting)toast('An app update is ready. Install it from Preferences.')})});await navigator.serviceWorker.ready;registration.active?.postMessage({type:'GET_OFFLINE_STATUS'});if(navigator.onLine)registration.active?.postMessage({type:'PREPARE_OFFLINE'});paint()}).catch(()=>{if(status)status.textContent='Offline setup unavailable';toast('Offline setup couldn’t finish. Reopen this site in Chrome while online.')});
+})();
